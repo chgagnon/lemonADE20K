@@ -10,6 +10,6 @@ class ADEImage():
 
         # Check if the input is a filename or not:
 
-
+# charlie added this to check github
 
         # Fill out everything

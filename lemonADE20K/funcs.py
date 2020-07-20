@@ -54,15 +54,39 @@ imported as Numpy arrays.
 '''
 
 '''
-@param phrases - list of strings (or list of 2-tuples) 
-                specifying real-world object or list of real-world objects to
-                require at least 1 of from each image in the returned list of
-                ADEImage objects
+@param phrases - list of 2-tuples, each specifying a real-world object or list of 
+                real-world objects to require at least n of from each image 
+                in the returned list of ADEImage objects
 
-                If phrase is a 2-tuple or list of 2-tuples, the first entry in
-                the tuple must be a string (real-world object name), and 
-                the second entry is an integer that indicates the minimum number 
-                of occurrences of that object in any image that will be returned
+                The first entry in the tuple must be a string 
+                (real-world object name), and the second entry is an integer 
+                that indicates the minimum number of occurrences of that object 
+                in any image that will be returned
+  
+                e.g. 
+
+                get_images((['beach', 'house', 'VCR'], 2)) returns all 
+                images that have at least 2 instances of a beach OR a house 
+                or a VCR
+
+                get_images([(['car'], 1), (['microwave oven'], 3)])
+                    --> each image has at least 1 car AND at least 3 
+                        microwave ovens
+
+                To collect a subset of the dataset with different integer
+                numbers required for objects that involve OR-wise selection,
+                make multiple calls to get_images(), like so:
+
+                get_images([[['boots', 'telephone'], 6], [['couch'], 1]])
+                    --> each image has at least 6 (boots OR telephone) AND at 
+                        least 1 couch
+
+                get_images((['lime'], 11))
+                    --> each image has at least 11 limes
+
+                --> concatenating these two results gives images with:
+  (at least 6 (boots OR telephone) AND at least 1 couch) OR (at least 11 limes)
+
 
 @param whitelist - list of strings or None (default)
                     
@@ -90,13 +114,6 @@ def get_images(phrases, whitelist=None):
   # get list of filenames that match
   # iterate over filenames, import images, construct ADEImage objects
   return None
-
-# !!!!!!!!!
-# TODO:
-# add capability to group a set of objects together, and place a minimum number of
-# occurrences on objects from that set
-
-
 
 
 

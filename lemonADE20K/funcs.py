@@ -1,12 +1,12 @@
-import ADEIndex
+from . import ADEIndex as ind_class
 
-index = ADEIndex()
+index = ind_class.ADEIndex()
 
 '''
 Delete and remake CSV indexes for the dataset
 '''
 def refresh_csv_tables():
-  index = ADEIndex(True)
+  index = ind_class.ADEIndex(True)
 
 '''
 # Getting Metadata Tables
@@ -15,7 +15,7 @@ Getter functions for Pandas columns of particular dataset attributes in the
 MATLAB index
 '''
 def _get_column(df, name):
-  return df.loc[,[name]]
+  return df.loc[:,[name]]
 
 def get_filename_column():
   return _get_column(index.image_index, 'filename')

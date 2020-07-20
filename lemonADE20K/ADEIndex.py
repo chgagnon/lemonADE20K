@@ -33,8 +33,6 @@ class ADEIndex:
 
     else:
 
-      print("No CSVs found - will save CSVs after loading MATLAB data")
-      print(_csv_folderpath)
 
       _mat_filename = os.path.join(sys.path[0], 'ADE20K_2016_07_26', 'index_ade20k.mat')
 
@@ -47,6 +45,8 @@ class ADEIndex:
          + ' into ./ADE20K_2016_07_26/')
         return
         # exit()
+
+      print("No CSVs found - will save CSVs after loading MATLAB data")
 
       _matindex = _mat_contents['index'][0,0]
 

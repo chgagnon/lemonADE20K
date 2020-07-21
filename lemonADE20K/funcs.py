@@ -1,4 +1,7 @@
+import numpy as np
+from skimage.io import imsave
 from . import ADEIndex as ind_class
+from . import ADEImage
 
 index = ind_class.ADEIndex()
 
@@ -109,10 +112,26 @@ get_images returns collection of ADEImage objects that:
 
 '''
 def get_images(phrases, whitelist=None):
+
+  img_paths, segmap_paths, folder_paths = get_filepaths(phrases, whitelist)
+  imgs = imread_collection(img_paths)
+  segmaps = imread_collection(segmap_paths)
+
   ade_imgs = []
+
+
   # TODO:
   # get list of filenames that match
   # iterate over filenames, import images, construct ADEImage objects
+    # REMEMBER TO USE ADEImage classmethod to construct objects from filepaths
+
+
+  if whitelist is None:
+    return ade_imgs
+  else:
+
+    # take imported segmaps, and knock out everything absent from the whitelist
+
   return None
 
 
@@ -120,8 +139,11 @@ def get_images(phrases, whitelist=None):
 '''
 Same inputs as get_images(), see above for description
 Returns list of complete filepaths to images and
-list of complete filepaths to segmentation maps (with corresponding indices
-between image-segmap pairs)
+list of complete filepaths to segmentation maps (with corresponding 
+indices between image-segmap pairs)
+
+For images that have multiple segmentation map files, get_filepaths() returns
+a list of those segmap filepaths for the entry corresponding to that image
 
 (Most useful for preparing a subset of the data to pass to TF, Torch, or some
 other graph-based data processing routine with unique image import statements)
@@ -131,6 +153,51 @@ directory setup more closely] to store images in with semantic content removed
 according to whitelist 
 '''
 def get_filepaths(phrases, whitelist=None):
+  folder_paths = []
+
+  # Allow for a single tuple as input, when the tuple is not enclosed in a list
+  if isinstance(phrases, tuple):
+    phrases = [phrases]
+
+  # phrase_group is a single string or a list of strings, group_freq is an int
+  for (phrase_group, group_freq) in phrases:
+    if not isinstance(group_freq, int):
+      print('Now skipping the condition specified by' +\
+             str((phrase_group, group_freq)) + ' because the frequency\
+             of the phrase or phrase group was not an int.')
+      continue
+
+    # convert phrase_group to a list (this does NOT handle cases that will cause errors later)
+    if isinstance(phrase_group, str):
+      phrase_group = [phrase_group]
+
+    object_cols_that_match = []
+    for p in phrase_group:
+        # get all columns that match to any phrases in the current phrase_group
+        object_cols_that_match.append(\
+          index.object_image_matrix.loc[:,\
+            [string for string in index.object_image_matrix.columns\
+              if p in string.split(", ")]])
+
+    group_totals = object_cols_that_match.sum(axis=1)
+
+    image_rows_for_this_group = group_totals.loc[group_totals >= group_freq]
+    image_paths_for_this_group = set()
+    for ind, row in image_rows_for_this_group.iterrow():
+      filepath = index.image_index.loc[ind, 'folder']
+      image_paths_for_this_group.add(filepath)
+
+    # Empty lists are false
+    if not folder_paths:
+      folder_paths.append(image_paths_for_this_group)
+    else:
+      # Across groups, conditions are joined with AND --> set intersection
+      folder_paths = set(folder_paths).intersection(set(image_paths_for_this_group))
+
+  if whitelist is None:
+    return None, None, folder_paths
+  else:
+    # knockout everything absent from whitelist
 
   # TODO: implement this
-  return None, None
+  return None, None, folder_paths

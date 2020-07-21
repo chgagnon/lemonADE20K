@@ -129,7 +129,7 @@ def get_images(phrases, whitelist=None):
   if whitelist is None:
     return ade_imgs
   else:
-
+    pass
     # take imported segmaps, and knock out everything absent from the whitelist
 
   return None
@@ -197,6 +197,7 @@ def get_filepaths(phrases, whitelist=None):
   if whitelist is None:
     return None, None, folder_paths
   else:
+    pass
     # knockout everything absent from whitelist
 
   # TODO: implement this

@@ -13,20 +13,18 @@ class ADEIndex:
     self.object_name_list = None
     self.object_image_matrix = None
     self._CSVsExist = False
-
-    _csv_folderpath = os.path.join(sys.path[0], 'csvIndexes')
-
+    self._csv_folderpath = os.path.join(sys.path[0], 'csvIndexes')
     self.num_images_total = None
 
-    if os.path.exists(_csv_folderpath)\
-      and os.path.exists(os.path.join(_csv_folderpath, 'image_index.csv'))\
-      and os.path.exists(os.path.join(_csv_folderpath, 'object_name_list.csv'))\
-      and os.path.exists(os.path.join(_csv_folderpath,'object_image_matrix.csv')):
+    if os.path.exists(self._csv_folderpath)\
+      and os.path.exists(os.path.join(self._csv_folderpath, 'image_index.csv'))\
+      and os.path.exists(os.path.join(self._csv_folderpath, 'object_name_list.csv'))\
+      and os.path.exists(os.path.join(self._csv_folderpath,'object_image_matrix.csv')):
 
       print("Now loading data from CSV files")
-      image_index = pd.read_csv(os.path.join(_csv_folderpath, 'image_index.csv'))
-      object_name_list = pd.read_csv(os.path.join(_csv_folderpath, 'object_name_list.csv'))
-      object_image_matrix = pd.read_csv(os.path.join(_csv_folderpath, 'object_image_matrix.csv'))
+      self.image_index = pd.read_csv(os.path.join(self._csv_folderpath, 'image_index.csv'))
+      self.object_name_list = pd.read_csv(os.path.join(self._csv_folderpath, 'object_name_list.csv'))
+      self.object_image_matrix = pd.read_csv(os.path.join(self._csv_folderpath, 'object_image_matrix.csv'))
       self._CSVsExist = True
 
       self.num_images_total = image_index.shape[0]
@@ -59,7 +57,7 @@ class ADEIndex:
 
       # putting image attributes in a DataFrame
 
-      _filename_col_nested = pd.DataFrame(matindex['filename'].T, columns=['filename'])
+      _filename_col_nested = pd.DataFrame(_matindex['filename'].T, columns=['filename'])
       
       _filename_col = pd.DataFrame(columns=['filename'])
 
@@ -81,7 +79,7 @@ class ADEIndex:
       # putting the columns together
       _int_indexed_image_index = pd.concat([_filename_col, _folder_col, _typeset_col, _scene_col], axis=1)
 
-      image_index = _int_indexed_image_index.set_index('filename')
+      self.image_index = _int_indexed_image_index.set_index('filename')
       # Need filename col to be the index AND a query-able column
       # (because conversion to csv makes the index just an int)
       # self.image_index = pd.concat([self.image_index, filename_col], axis=1)
@@ -98,11 +96,11 @@ class ADEIndex:
 
       # Putting object attributes in a DataFrame
 
-      object_name_list_nested = pd.DataFrame(matindex['objectnames'].T, columns=['objectnames'])
+      object_name_list_nested = pd.DataFrame(_matindex['objectnames'].T, columns=['objectnames'])
 
-      object_name_list = pd.DataFrame(columns=['objectnames'])
+      self.object_name_list = pd.DataFrame(columns=['objectnames'])
       for index, row in object_name_list_nested.iterrows():
-        object_name_list.loc[index] = object_name_list_nested['objectnames'][index][0]
+        self.object_name_list.loc[index] = object_name_list_nested['objectnames'][index][0]
 
       # ----
 
@@ -114,20 +112,19 @@ class ADEIndex:
 
       # image filenames are rows, and words (object names) are columns
 
-      object_image_matrix = pd.DataFrame(matindex['objectPresence'].T, 
-                                        columns=object_name_list['objectnames'],
-                                        index=filename_col['filename'])
+      self.object_image_matrix = pd.DataFrame(_matindex['objectPresence'].T, 
+                                        columns=self.object_name_list['objectnames'],
+                                        index=_filename_col['filename'])
 
       # object_cols_that_match = object_image_matrix.loc[:,[x for x in object_image_matrix.columns if 'vcr' in x]]
       # for (colName, colData) in object_cols_that_match.iteritems():
       #   image_rows_to_add = object_image_matrix.loc[object_image_matrix[colName] != 0]
       #   print(image_rows_to_add)
 
-    print("CSVs exist: ", self.CSVsExist)
-    if refreshCSVs or (self.CSVsExist == False):
-      if os.path.exists(csv_folderpath):
-        shutil.rmtree(csv_folderpath)
-      os.mkdir(csv_folderpath)
+    if refreshCSVs or (not self._CSVsExist):
+      if os.path.exists(self._csv_folderpath):
+        shutil.rmtree(self._csv_folderpath)
+      os.mkdir(self._csv_folderpath)
       print("Now saving CSV files")
       self.save_all_CSVs()
       print("Your CSV files are now toasty and warm")
@@ -135,6 +132,6 @@ class ADEIndex:
   # Function to produce all 3 CSV files
   # THE LAST ONE IS KINDA BIG (for a CSV) - around 300 MB
   def save_all_CSVs(self):
-    self.image_index.to_csv(os.path.join(_csv_folderpath,"image_index.csv"))
-    self.object_name_list.to_csv(os.path.join(_csv_folderpath, 'object_name_list.csv'))
-    self.object_image_matrix.to_csv(os.path.join(_csv_folderpath,"object_image_matrix.csv"))
+    self.image_index.to_csv(os.path.join(self._csv_folderpath,"image_index.csv"))
+    self.object_name_list.to_csv(os.path.join(self._csv_folderpath, 'object_name_list.csv'))
+    self.object_image_matrix.to_csv(os.path.join(self._csv_folderpath,"object_image_matrix.csv"))

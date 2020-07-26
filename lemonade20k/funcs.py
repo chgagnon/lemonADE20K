@@ -1,7 +1,9 @@
 import numpy as np
+import pandas as pd
 from skimage.io import imsave
 from . import ADEIndex as ind_class
-from . import ADEImage
+from . import ADESubset
+from .exceptions import QueryPhrasesError
 
 index = ind_class.ADEIndex()
 
@@ -96,7 +98,7 @@ imported as Numpy arrays.
                    If None, no semantic content is removed from the segmentation
                    maps (equivalent to whitelisting all objects)
 
-get_images returns collection of ADEImage objects that:
+get_images returns an ADESubset object that contains images that:
   
   # Include objects specified by phrase
 
@@ -117,8 +119,7 @@ def get_images(phrases, whitelist=None):
   imgs = imread_collection(img_paths)
   segmaps = imread_collection(segmap_paths)
 
-  ade_imgs = []
-
+  subset = ADESubset(imgs, segmaps, folder_paths)
 
   # TODO:
   # get list of filenames that match
@@ -157,8 +158,17 @@ def get_filepaths(phrases, whitelist=None):
 
   # Allow for a single tuple as input, when the tuple is not enclosed in a list
   if isinstance(phrases, tuple):
+    print('converting tuple to 1-elem list of a single tuple')
     phrases = [phrases]
 
+  if not isinstance(phrases, list):
+    print('Input to get_filepaths is not a valid list of tuples.')
+    message = "Query phrases must be lists of tuples of the form " +\
+              "described in the documentation. Instead, the input phrases had" +\
+              " type " + str(type(phrases))
+    raise QueryPhrasesError(message)
+
+  print('Phrases is: ', phrases)
   # phrase_group is a single string or a list of strings, group_freq is an int
   for (phrase_group, group_freq) in phrases:
     if not isinstance(group_freq, int):
@@ -171,19 +181,23 @@ def get_filepaths(phrases, whitelist=None):
     if isinstance(phrase_group, str):
       phrase_group = [phrase_group]
 
-    object_cols_that_match = []
+    object_cols_that_match = pd.DataFrame()
     for p in phrase_group:
         # get all columns that match to any phrases in the current phrase_group
-        object_cols_that_match.append(\
-          index.object_image_matrix.loc[:,\
-            [string for string in index.object_image_matrix.columns\
-              if p in string.split(", ")]])
+        cols_to_add = index.object_image_matrix.loc[:,\
+                      [string for string in index.object_image_matrix.columns\
+                        if p in string.split(", ")]]
+        print(cols_to_add)
+        print('p is: ', p)
+
+        object_cols_that_math = pd.concat([object_cols_that_match, cols_to_add], axis=1)
 
     group_totals = object_cols_that_match.sum(axis=1)
+    print(group_totals)
 
     image_rows_for_this_group = group_totals.loc[group_totals >= group_freq]
     image_paths_for_this_group = set()
-    for ind, row in image_rows_for_this_group.iterrow():
+    for ind, row in image_rows_for_this_group.iterrows():
       filepath = index.image_index.loc[ind, 'folder']
       image_paths_for_this_group.add(filepath)
 
@@ -202,3 +216,39 @@ def get_filepaths(phrases, whitelist=None):
 
   # TODO: implement this
   return None, None, folder_paths
+
+'''
+Reports which objects in the dataset will match to an input string passed
+to get_filepaths() or get_images()
+
+@param object_lookup_string - a string
+
+@return The list of objects (in the format recorded in the dataset) that would
+        match to the input string if the input was one of the lookup strings
+        passed to get_filepaths() or get_images()
+
+NOTE: Many objects have multiple, synonymous names in the dataset. As a result,
+      this function may return single strings that contain multiple 
+      terms, with the terms within the string separated by a comma. Since 
+      the dataset treats these words as synonyms, querying the dataset should
+      give the same result for any choice from such a list of synonyms.
+
+      DO NOT include multiple synonyms in a single query. This package "splits
+      on" commas when dealing with synonyms. Including a comma in a query term
+      will likely cause the query to match to ZERO objects names.
+        
+'''
+def check_object_matches(object_lookup_string):
+  matches = []
+  for ind, row in index.object_name_list.iterrows():
+      object_col_name = row['objectnames']
+      if object_lookup_string in object_col_name:
+        matches.append(object_col_name)
+
+  # Empty lists are false
+  if not matches:
+    print(object_lookup_string + " has no matches to known objects in the dataset.")
+  else:
+    print(object_lookup_string + " matches to THESE " + str(len(matches)) 
+          + " entries: ")
+    print(matches)

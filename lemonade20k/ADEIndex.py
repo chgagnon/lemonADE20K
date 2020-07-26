@@ -27,7 +27,7 @@ class ADEIndex:
       self.object_image_matrix = pd.read_csv(os.path.join(self._csv_folderpath, 'object_image_matrix.csv'))
       self._CSVsExist = True
 
-      self.num_images_total = image_index.shape[0]
+      self.num_images_total = self.image_index.shape[0]
 
     else:
 

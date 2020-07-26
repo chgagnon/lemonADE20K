@@ -1,10 +1,11 @@
 from skimage.io import imread
 
-class ADEImage:
-    def __init__(self, image, segmap, filename):
-      self.img = image
-      self.segmap = segmap
-      self.filename = filename
+# Corresponding image-segmap-filename entries have the same index in all 3 lists
+class ADESubset:
+    def __init__(self, images, segmaps, filenames):
+      self.imgs = images
+      self.segmaps = segmaps
+      self.filenames = filenames
 
     '''  
     This method is NOT used in get_images() because image caching is handled
@@ -17,11 +18,11 @@ class ADEImage:
     --> Use get_images() (from funcs.py) to import a large number of images
     '''
     @classmethod
-    def from_filename(cls, filename):
+    def from_filename(cls, filenames):
       # TODO: query, import, construct ADEImage
 
       # view contents of filename (directory for ADEImage)
       # regex to separate photo filepath and segmap filepath(s)
       # import each
 
-      return cls(image, segmap, filename)
+      return cls(images, segmaps, filenames)

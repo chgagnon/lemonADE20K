@@ -3,7 +3,7 @@ import pandas as pd
 from skimage.io import imsave
 from . import ADEIndex as ind_class
 from . import ADESubset
-from .exceptions import QueryPhrasesError
+from .exceptions import QueryPhrasesFormatError
 
 index = ind_class.ADEIndex()
 
@@ -154,11 +154,11 @@ directory setup more closely] to store images in with semantic content removed
 according to whitelist 
 '''
 def get_filepaths(phrases, whitelist=None):
-  folder_paths = []
+  folder_paths = set()
 
   # Allow for a single tuple as input, when the tuple is not enclosed in a list
   if isinstance(phrases, tuple):
-    print('converting tuple to 1-elem list of a single tuple')
+    print('Converting input tuple to 1-elem list of a single tuple')
     phrases = [phrases]
 
   if not isinstance(phrases, list):
@@ -166,7 +166,7 @@ def get_filepaths(phrases, whitelist=None):
     message = "Query phrases must be lists of tuples of the form " +\
               "described in the documentation. Instead, the input phrases had" +\
               " type " + str(type(phrases))
-    raise QueryPhrasesError(message)
+    raise QueryPhrasesFormatError(message)
 
   print('Phrases is: ', phrases)
   # phrase_group is a single string or a list of strings, group_freq is an int
@@ -183,32 +183,36 @@ def get_filepaths(phrases, whitelist=None):
 
     object_cols_that_match = pd.DataFrame()
     for p in phrase_group:
-        # get all columns that match to any phrases in the current phrase_group
-        cols_to_add = index.object_image_matrix.loc[:,\
-                      [string for string in index.object_image_matrix.columns\
-                        if p in string.split(", ")]]
-        print(cols_to_add)
-        print('p is: ', p)
+      # get all columns that match to any phrases in the current phrase_group
+      cols_to_add = index.object_image_matrix.loc[:,\
+                    [string for string in index.object_image_matrix.columns\
+                      if p in string.split(", ")]]
+      print('cols to add is: ', cols_to_add)
+      print('p is: ', p)
 
-        object_cols_that_math = pd.concat([object_cols_that_match, cols_to_add], axis=1)
+      object_cols_that_match = pd.concat([object_cols_that_match, cols_to_add], axis=1)
 
+    print('obj cols that match is: ', object_cols_that_match)
     group_totals = object_cols_that_match.sum(axis=1)
-    print(group_totals)
+    print('group totals is: ', group_totals)
 
     image_rows_for_this_group = group_totals.loc[group_totals >= group_freq]
-    image_paths_for_this_group = set()
-    for ind, row in image_rows_for_this_group.iterrows():
-      filepath = index.image_index.loc[ind, 'folder']
-      image_paths_for_this_group.add(filepath)
 
-    # Empty lists are false
-    if not folder_paths:
-      folder_paths.append(image_paths_for_this_group)
+    image_paths_for_this_group = set()
+    for ind, item in image_rows_for_this_group.iteritems():
+      folderpath = index.image_index.loc[ind, 'folder']
+      image_paths_for_this_group.add(folderpath)
+
+    print('img paths for this group: ', image_paths_for_this_group, type(image_paths_for_this_group))
+    # Empty sets are false
+    if not bool(folder_paths):
+      folder_paths = set(image_paths_for_this_group)
     else:
       # Across groups, conditions are joined with AND --> set intersection
-      folder_paths = set(folder_paths).intersection(set(image_paths_for_this_group))
+      folder_paths = folder_paths.intersection(set(image_paths_for_this_group))
 
   if whitelist is None:
+    print('whitelist is none')
     return None, None, folder_paths
   else:
     pass
@@ -235,14 +239,14 @@ NOTE: Many objects have multiple, synonymous names in the dataset. As a result,
 
       DO NOT include multiple synonyms in a single query. This package "splits
       on" commas when dealing with synonyms. Including a comma in a query term
-      will likely cause the query to match to ZERO objects names.
+      will likely cause the query to match to ZERO object names.
         
 '''
 def check_object_matches(object_lookup_string):
   matches = []
   for ind, row in index.object_name_list.iterrows():
       object_col_name = row['objectnames']
-      if object_lookup_string in object_col_name:
+      if object_lookup_string in object_col_name.split(", "):
         matches.append(object_col_name)
 
   # Empty lists are false

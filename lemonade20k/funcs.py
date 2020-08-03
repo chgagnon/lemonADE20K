@@ -139,9 +139,16 @@ def get_images(phrases, whitelist=None):
 
 '''
 Same inputs as get_images(), see above for description
-Returns list of complete filepaths to images and
+
+Returns list of complete filepaths to images,
 list of complete filepaths to segmentation maps (with corresponding 
-indices between image-segmap pairs)
+indices between image-segmap pairs),
+and list of filepaths to folders
+
+Images and segmentation maps occur only once, but if two distinct images
+occur in the same folder in the dataset, that folder will occur multiple times
+in the list of folder paths (so that corresponding indices can be used
+between the three returned lists)
 
 For images that have multiple segmentation map files, get_filepaths() returns
 a list of those segmap filepaths for the entry corresponding to that image
@@ -149,12 +156,15 @@ a list of those segmap filepaths for the entry corresponding to that image
 (Most useful for preparing a subset of the data to pass to TF, Torch, or some
 other graph-based data processing routine with unique image import statements)
 
-Creates directory within [decide where to put this after looking at ADE
-directory setup more closely] to store images in with semantic content removed
-according to whitelist 
+If whitelist is defined:
+  Creates directory within [decide where to put this after looking at ADE
+  directory setup more closely] to store images in with semantic content removed
+  according to whitelist 
 '''
 def get_filepaths(phrases, whitelist=None):
-  folder_paths = set()
+  image_paths = set()
+  segmap_paths = set()
+  folder_paths = []
 
   # Allow for a single tuple as input, when the tuple is not enclosed in a list
   if isinstance(phrases, tuple):
@@ -198,28 +208,54 @@ def get_filepaths(phrases, whitelist=None):
 
     image_rows_for_this_group = group_totals.loc[group_totals >= group_freq]
 
-    image_paths_for_this_group = set()
+    image_paths_for_this_group = []
+    folder_paths_for_this_group = []
     for ind, item in image_rows_for_this_group.iteritems():
+      imagepath = index.image_index.loc[ind, 'filename']
       folderpath = index.image_index.loc[ind, 'folder']
-      image_paths_for_this_group.add(folderpath)
+      
+      image_paths_for_this_group.append(imagepath)
+      folder_paths_for_this_group.append(folderpath)
 
-    print('img paths for this group: ', image_paths_for_this_group, type(image_paths_for_this_group))
+    # print('img paths for this group: ', image_paths_for_this_group, type(image_paths_for_this_group))
+
     # Empty sets are false
-    if not bool(folder_paths):
-      folder_paths = set(image_paths_for_this_group)
+    # if not bool(folder_paths):
+    #   folder_paths = set(image_paths_for_this_group)
+    # else:
+    #   # Across groups, conditions are joined with AND --> set intersection
+    #   folder_paths = folder_paths.intersection(set(image_paths_for_this_group))
+    if not bool(image_paths):
+      image_paths = set(image_paths_for_this_group)
+      image_paths_check = set(image_paths_for_this_group)
+      folder_paths = folder_paths_for_this_group
     else:
       # Across groups, conditions are joined with AND --> set intersection
-      folder_paths = folder_paths.intersection(set(image_paths_for_this_group))
+      # This is an array of booleans:
+      indices_of_matched_imgs = np.isin(list(image_paths), image_paths_for_this_group)
+                                                # must cast image_paths to a list for isin to work right
+      # Logical indexing:
+      image_paths = set(np.array(list(image_paths))[indices_of_matched_imgs])
+
+      image_paths_check = image_paths_check.intersection(set(image_paths_for_this_group))
+      print(len(image_paths))
+      print(len(image_paths_check))
+      print(image_paths_check)
+      assert(image_paths == image_paths_check)
+
+      folder_paths = set(np.array(folder_paths)[indices_of_matched_imgs])
 
   if whitelist is None:
     print('whitelist is none')
-    return None, None, folder_paths
+    return image_paths, segmap_paths, folder_paths
   else:
     pass
     # knockout everything absent from whitelist
 
   # TODO: implement this
-  return None, None, folder_paths
+  # these paths will be paths to a new dataset directory 
+  #  (determine where to place this after looking closely at the default directory)
+  return image_paths, segmap_paths, folder_paths
 
 '''
 Reports which objects in the dataset will match to an input string passed

@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import glob
+from os.path import join
+import sys
 from skimage.io import imsave
 from . import ADEIndex as ind_class
 from . import ADESubset
@@ -98,6 +101,13 @@ imported as Numpy arrays.
                    If None, no semantic content is removed from the segmentation
                    maps (equivalent to whitelisting all objects)
 
+@param withParts - boolean
+
+                  If True, an image's "parts" segmaps (used to indicate
+                  z-axis occlusion) will be returned from get_filepaths()
+                  and imported into a list of segmaps for the corresponding
+                  image
+
 get_images returns an ADESubset object that contains images that:
   
   # Include objects specified by phrase
@@ -113,9 +123,9 @@ get_images returns an ADESubset object that contains images that:
     indicates "unknown" semantic content
 
 '''
-def get_images(phrases, whitelist=None):
+def get_images(phrases, whitelist=None, withParts=False):
 
-  img_paths, segmap_paths, folder_paths = get_filepaths(phrases, whitelist)
+  img_paths, segmap_paths, folder_paths = get_filepaths(phrases, whitelist, withParts)
   imgs = imread_collection(img_paths)
   segmaps = imread_collection(segmap_paths)
 
@@ -161,9 +171,9 @@ If whitelist is defined:
   directory setup more closely] to store images in with semantic content removed
   according to whitelist 
 '''
-def get_filepaths(phrases, whitelist=None):
-  image_paths = set()
-  segmap_paths = set()
+def get_filepaths(phrases, whitelist=None, withParts=False):
+  image_paths = []
+  segmap_paths = []
   folder_paths = []
 
   # Allow for a single tuple as input, when the tuple is not enclosed in a list
@@ -213,37 +223,95 @@ def get_filepaths(phrases, whitelist=None):
     for ind, item in image_rows_for_this_group.iteritems():
       imagepath = index.image_index.loc[ind, 'filename']
       folderpath = index.image_index.loc[ind, 'folder']
+      # if imagepath == 'ADE_train_00002222.jpg':
+      #   print(folderpath)
+      #   return
       
       image_paths_for_this_group.append(imagepath)
       folder_paths_for_this_group.append(folderpath)
 
     # print('img paths for this group: ', image_paths_for_this_group, type(image_paths_for_this_group))
 
-    # Empty sets are false
+    # Empty sets/lists are false
     # if not bool(folder_paths):
     #   folder_paths = set(image_paths_for_this_group)
     # else:
     #   # Across groups, conditions are joined with AND --> set intersection
     #   folder_paths = folder_paths.intersection(set(image_paths_for_this_group))
     if not bool(image_paths):
-      image_paths = set(image_paths_for_this_group)
+      image_paths = image_paths_for_this_group
       image_paths_check = set(image_paths_for_this_group)
       folder_paths = folder_paths_for_this_group
     else:
       # Across groups, conditions are joined with AND --> set intersection
       # This is an array of booleans:
-      indices_of_matched_imgs = np.isin(list(image_paths), image_paths_for_this_group)
+      indices_of_matched_imgs = np.isin(image_paths, image_paths_for_this_group)
+      # with open("result.txt", "w") as output:
+      #   output.write('Existing paths:\n')
+      #   for i in image_paths_check:
+      #     output.write(i + '\n')
+
+      #   output.write('New group:\n')
+      #   for i in image_paths_for_this_group:
+      #     output.write(i + '\n')
+
+      #   output.write('Matching indices:\n')
+      #   for i in indices_of_matched_imgs:
+      #     output.write(str(i) + '\n')
+      num_matches = np.sum(indices_of_matched_imgs)
+      print('num matches is ', num_matches)
                                                 # must cast image_paths to a list for isin to work right
       # Logical indexing:
-      image_paths = set(np.array(list(image_paths))[indices_of_matched_imgs])
+      print('image paths length is: ', len(image_paths))
+      r = input('paused for input (1/4)')
+      image_paths = list(np.array(image_paths)[indices_of_matched_imgs])
+      print('image paths length is: ', len(image_paths))
+      r = input('paused for input (2/4)')
 
       image_paths_check = image_paths_check.intersection(set(image_paths_for_this_group))
       print(len(image_paths))
       print(len(image_paths_check))
       print(image_paths_check)
-      assert(image_paths == image_paths_check)
+      # assert(image_paths == image_paths_check)
 
-      folder_paths = set(np.array(folder_paths)[indices_of_matched_imgs])
+      print('folder_paths length is: ', len(folder_paths))
+      r = input('paused for input (3/4)')
+      folder_paths_arr = np.array(folder_paths)
+      print(folder_paths_arr)
+      print(folder_paths_arr.shape)
+      print(indices_of_matched_imgs.shape)
+      for ind, elem in enumerate(indices_of_matched_imgs):
+        if elem:
+          print(ind)
+      folder_paths_matches = folder_paths_arr[indices_of_matched_imgs]
+      print(folder_paths_matches)
+      folder_paths = list(folder_paths_matches)
+      print(folder_paths)
+
+      # folder_paths = list(np.array(list(folder_paths))[indices_of_matched_imgs])
+      print('folder_paths length is: ', len(folder_paths), folder_paths)
+
+      r = input('paused for input (4/4)')
+
+
+      assert(image_paths != folder_paths)
+      assert(len(image_paths) == len(folder_paths))
+
+  # Get segmap paths by RegEx-ing on image paths
+  for i, path in enumerate(image_paths):
+    # Remove .jpg suffix
+    image_name = path[:-4]
+
+    seg_matches = glob.glob(join(sys.path[0], folder_paths[i], image_name + '_seg.png'))
+
+    if withParts:
+      # Sorting makes _parts_1 occur before _parts_2 in each image list
+      parts_matches = sorted(glob.glob(join(sys.path[0], folder_paths[i], image_name + '_parts_*.png')))
+      # Extending in this way assures primary segmap is always at index 0 for the given image
+      seg_matches.extend(parts_matches)
+
+    segmap_paths.append(seg_matches)
+
 
   if whitelist is None:
     print('whitelist is none')
@@ -287,8 +355,8 @@ def check_object_matches(object_lookup_string):
 
   # Empty lists are false
   if not matches:
-    print(object_lookup_string + " has no matches to known objects in the dataset.")
+    print(object_lookup_string + " has NO matches to object names in the dataset.")
   else:
     print(object_lookup_string + " matches to THESE " + str(len(matches)) 
-          + " entries: ")
+          + " object names: ")
     print(matches)

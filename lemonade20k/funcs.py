@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 from os.path import join
 import sys
-from skimage.io import imsave
+from skimage.io import imsave, imread_collection, imread
 from . import ADEIndex as ind_class
 from . import ADESubset
 from .exceptions import QueryPhrasesFormatError
@@ -57,12 +57,77 @@ def get_object_image_matrix():
 Sets all semantic regions of a segmap that are NOT listed on objects whitelist
 to 0 (the value that indicates "unknown" content)
 
+Renumbers remaining semantic content with pixel codes from 1 to n, where n 
+is the number of distinct objects in the whitelist
+
 Saves segmaps to ADE20K_2016_07_26/whitlelisted/folder_path/segmap
 
-@return - the new path to the segmap
+@return - 2-tuple: (path to the new segmap, path to folder containing new segmap)
 '''
-def _knockout_segmap(segmap, folder_path, whitelist):
-  pass
+def _knockout_segmap(initial_segmap, folder_path, whitelist):
+    
+    r = initial_segmap[:,:,0]
+    g = initial_segmap[:,:,1]
+
+    r = r.astype(np.uint16)
+    g = g.astype(np.uint16)
+
+    object_map =  np.floor((r / 10)) * 256 + g
+    whether_values_are_zero = object_map == 0
+    # to fix MATLAB indexing
+    object_map[whether_values_are_zero] = 1
+
+    # get unique image labels in the decoded segmap (list of contained objects)
+    unique_obj_codes = np.unique(object_map)
+    # if object is not in our list of approved objects, then set all pixels of this object to 0
+    num_approved_words_in_img = 0
+    for code in unique_obj_codes:
+        # the MATLAB indexing fix described above /should/ prevent this from being a key error
+        img_object_name = index.object_name_list['objectnames'].loc[code - 1]
+
+        approved_code = False
+        # Checking if current object is on our list of approved words
+        for word_index, word in enumerate(whitelist):
+            # This "in" is checking list containment (img_object_name.split(", ")) is a list of strings
+            if word in img_object_name.split(", "):
+                # This objectname matches the current whitelist word
+                num_approved_words_in_img += 1
+                parts_of_object_map_with_this_object = object_map == code
+                object_map[parts_of_object_map_with_this_object] = num_approved_words_in_img
+                approved_code = True
+                break
+
+        if approved_code:
+            # print(img_object_name + " is approved")
+            pass
+        else:
+            # Current code is not on the whitelist
+            parts_of_object_map_with_this_object = object_map == code
+            object_map[parts_of_object_map_with_this_object] = 0
+
+    # Now, object_map has nonzero pixel values only for objects that we care about
+    object_map = object_map.astype(np.float64)
+
+    npy_segmap = np.array(object_map)
+
+    # Normalize segmap values from 0 to 255
+
+    npy_segmap *= 255.0/npy_segmap.max()
+
+    generic_filename, ext = os.path.splitext(filename)
+
+    if whether_training:
+        f = os.path.join(train_dir, filename)
+        npy_path = os.path.join(train_dir,generic_filename)
+        #print("Resized segmap is ", resized_segmap)
+        #print("Shape is ", resized_segmap.shape)
+        imsave(f, resized_segmap)
+        #print("Saving training segmap " + f)
+    else:
+        f = os.path.join(test_dir, filename)
+        npy_path = os.path.join(test_dir,generic_filename)
+        imsave(f, resized_segmap)
+        #print("Saving testing segmap " + f)
 
 '''
 # Getting Images

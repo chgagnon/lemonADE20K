@@ -1,3 +1,6 @@
+# .txt outputs from figuring out that set() does NOT preserve list ordering
+result*
+
 # macOS filesystem metadata
 ._*
 

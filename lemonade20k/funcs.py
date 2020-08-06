@@ -54,9 +54,20 @@ def get_object_image_matrix():
   return index.object_image_matrix
 
 '''
+Sets all semantic regions of a segmap that are NOT listed on objects whitelist
+to 0 (the value that indicates "unknown" content)
+
+Saves segmaps to ADE20K_2016_07_26/whitlelisted/folder_path/segmap
+
+@return - the new path to the segmap
+'''
+def _knockout_segmap(segmap, folder_path, whitelist):
+  pass
+
+'''
 # Getting Images
 
-Functions that query the dataset and return collections of ADEImage objects,
+Functions that query the dataset and return ADESubset objects,
 which store real images and the corresponding segmentation maps,
 imported as Numpy arrays.
 '''
@@ -64,7 +75,7 @@ imported as Numpy arrays.
 '''
 @param phrases - list of 2-tuples, each specifying a real-world object or list of 
                 real-world objects to require at least n of from each image 
-                in the returned list of ADEImage objects
+                in the returned ADESubset object
 
                 The first entry in the tuple must be a string 
                 (real-world object name), and the second entry is an integer 
@@ -125,26 +136,29 @@ get_images returns an ADESubset object that contains images that:
 '''
 def get_images(phrases, whitelist=None, withParts=False):
 
-  img_paths, segmap_paths, folder_paths = get_filepaths(phrases, whitelist, withParts)
-  imgs = imread_collection(img_paths)
-  segmaps = imread_collection(segmap_paths)
-
-  subset = ADESubset(imgs, segmaps, folder_paths)
-
   # TODO:
   # get list of filenames that match
-  # iterate over filenames, import images, construct ADEImage objects
+  # iterate over filenames, import images, construct ADESubset object
     # REMEMBER TO USE ADEImage classmethod to construct objects from filepaths
-
+    # ^^ NO don't do that because imread_collection handles caching across many images better
 
   if whitelist is None:
-    return ade_imgs
+    img_paths, segmap_paths, folder_paths = get_filepaths(phrases, whitelist, withParts)
+    imgs = imread_collection(img_paths)
+    # This could be a problem: segmaps has sublists for images with _parts_* maps
+    # --> MAKE SURE TO TEST FOR THIS
+    segmaps = imread_collection(segmap_paths)
+
+    return ADESubset(imgs, img_paths, segmaps, segmap_paths, folder_paths)
   else:
-    pass
-    # take imported segmaps, and knock out everything absent from the whitelist
+    whitelisted_folder_paths = []
+    for i, folder in enumerate(folder_paths):
+      new_segmap_path, whitelisted_folder_path = _knockout_segmap(segmaps[i], folder, whitelist)
+      segmaps[i] = imread(new_segmap_path)
+      segmap_paths[i] = new_segmap_path
+      whitelisted_folder_paths.append(whitelisted_folder_path)
 
-  return None
-
+    return ADESubset(imgs, img_paths, segmaps, segmap_paths, folder_paths, whitelisted_folder_paths)
 
 
 '''
@@ -167,9 +181,14 @@ a list of those segmap filepaths for the entry corresponding to that image
 other graph-based data processing routine with unique image import statements)
 
 If whitelist is defined:
-  Creates directory within [decide where to put this after looking at ADE
-  directory setup more closely] to store images in with semantic content removed
+  Creates ADE20K_2016_07_26/whitlelisted/folder_path/segmap within 
+  ADE20K_2016_07_26/, which contains images in with semantic content is removed
   according to whitelist 
+
+  Returns an additional (fourth) parameter: whitelisted_folder_paths
+
+  The ith entry of whitelisted_folder_paths is the path to the folder within
+  ADE20K_2016_07_26/whitlelisted/ that contains the ith entry of image_paths
 '''
 def get_filepaths(phrases, whitelist=None, withParts=False):
   image_paths = []
@@ -293,7 +312,6 @@ def get_filepaths(phrases, whitelist=None, withParts=False):
 
       r = input('paused for input (4/4)')
 
-
       assert(image_paths != folder_paths)
       assert(len(image_paths) == len(folder_paths))
 
@@ -312,13 +330,18 @@ def get_filepaths(phrases, whitelist=None, withParts=False):
 
     segmap_paths.append(seg_matches)
 
-
   if whitelist is None:
     print('whitelist is none')
     return image_paths, segmap_paths, folder_paths
   else:
-    pass
-    # knockout everything absent from whitelist
+    whitelisted_folder_paths = []
+    for i, folder in enumerate(folder_paths):
+      new_segmap_path, whitelisted_folder_path = _knockout_segmap(segmaps[i], folder, whitelist)
+      segmap_paths[i] = new_segmap_path
+      whitelisted_folder_paths.append(whitelisted_folder_path)
+
+    return image_paths, segmap_paths, folder_paths, whitelisted_folder_paths
+
 
   # TODO: implement this
   # these paths will be paths to a new dataset directory 

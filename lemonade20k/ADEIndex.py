@@ -31,7 +31,6 @@ class ADEIndex:
 
     else:
 
-
       _mat_filename = os.path.join(sys.path[0], 'ADE20K_2016_07_26', 'index_ade20k.mat')
 
       try:

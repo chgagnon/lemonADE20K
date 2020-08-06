@@ -2,10 +2,15 @@ from skimage.io import imread
 
 # Corresponding image-segmap-filename entries have the same index in all 3 lists
 class ADESubset:
-    def __init__(self, images, segmaps, filenames):
+    def __init__(self, images, image_paths, segmaps, segmap_paths, folder_paths,
+     whitelisted_folder_paths=None):
+      
       self.imgs = images
+      self.img_paths = image_paths
       self.segmaps = segmaps
-      self.filenames = filenames
+      self.segmap_paths = segmap_paths
+      self.folder_paths = folder_paths
+      self.whitelisted_folder_paths = whitelisted_folder_paths
 
     '''  
     This method is NOT used in get_images() because image caching is handled
